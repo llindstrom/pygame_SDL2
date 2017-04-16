@@ -7,7 +7,7 @@
 
 
 #--StartConfig
-SDL = -I/usr/include -D_REENTRANT -DSDL2 -lSDL2
+SDL = -I/usr/include -D_REENTRANT -lSDL2
 FONT = -lSDL2_ttf
 IMAGE = -lSDL2_image
 MIXER = -lSDL2_mixer
@@ -46,6 +46,7 @@ _freetype src/freetype/ft_cache.c src/freetype/ft_wrap.c src/freetype/ft_render.
 base src/base.c $(SDL) $(DEBUG)
 color src/color.c $(SDL) $(DEBUG)
 constants src/constants.c $(SDL) $(DEBUG)
+window src/pygame.window.pyx.c $(SDL) $(DEBUG)
 display src/display.c $(SDL) $(DEBUG)
 event src/event.c $(SDL) $(DEBUG)
 #fastevent src/fastevent.c src/fastevents.c $(SDL) $(DEBUG)

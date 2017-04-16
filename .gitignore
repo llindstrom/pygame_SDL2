@@ -28,6 +28,10 @@
 # VIM temporary files
 *.swp
 
+# Cython generated C files
+src/pygame.window.c
+src/pygame.window_api.h
+
 # Other
 envdev*
 .virtualenv*

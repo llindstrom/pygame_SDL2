@@ -37,6 +37,7 @@ static void do_set_icon (PyObject *surface);
 static PyObject* DisplaySurfaceObject = NULL;
 static int icon_was_set = 0;
 #else /* SDL2 */
+#include "pygame.window_api.h"
 
 typedef struct _display_state_s {
     char* title;
@@ -1625,6 +1626,11 @@ MODINIT_DEFINE (display)
     if (PyErr_Occurred ()) {
         MODINIT_ERROR;
     }
+#ifdef SDL2
+    if (import_pygame__window ()) {
+        MODINIT_ERROR;
+    }
+#endif /* SDL2 */
 
 #ifndef SDL2
     /* type preparation */
@@ -1662,6 +1668,19 @@ MODINIT_DEFINE (display)
         MODINIT_ERROR;
     }
 #else /* SDL2 */
+    Py_INCREF (pgRendererWindow_Type);
+    if (PyModule_AddObject (module, "RendererWindow", pgRendererWindow_Type)) {
+        Py_DECREF (pgRendererWindow_Type);
+        DECREF_MOD (module);
+        MODINIT_ERROR;
+    }
+    Py_INCREF (pgSurfaceWindow_Type);
+    if (PyModule_AddObject (module, "SurfaceWindow", pgSurfaceWindow_Type)) {
+        Py_DECREF (pgSurfaceWindow_Type);
+        DECREF_MOD (module);
+        MODINIT_ERROR;
+    }
+
     state = DISPLAY_MOD_STATE (module);
     state->title = NULL;
     state->icon = NULL;

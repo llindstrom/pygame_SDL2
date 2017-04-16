@@ -53,6 +53,7 @@ import distutils.sysconfig
 from distutils.core import setup, Extension, Command
 from distutils.extension import read_setup_file
 from distutils.command.install_data import install_data
+from Cython.Build import cythonize
 
 # Retrieve the repository revision (HG node identifier), if possible.
 def get_hg_identifier():
@@ -168,6 +169,25 @@ except:
 perhaps make a clean copy from "Setup.in".""")
     raise
 
+#compile Cython source to C
+new_extensions = []
+for e in extensions:
+    sources = e.sources
+    if sources and sources[0].endswith('.pyx.c'):
+        # Have a Cython extension:
+        # Remove the '.c' prefix used to trick read_setup_file().
+        file_path = sources[0][0:-2]
+        e.sources[0] = file_path
+
+        # Add source directory for '.pxd' search.
+        e.include_dirs.append(os.path.dirname(file_path))
+
+        # Append replacement Extension object(s)
+        new_extensions.extend(cythonize(e))
+    else:
+        # Just a plain C extension module.
+        new_extensions.append(e)
+extensions = new_extensions
 
 #decide whether or not to enable new buffer protocol support
 enable_newbuf = False
