@@ -7,7 +7,7 @@ This is adapted from the SDL 2 example at
 """
 
 import pygame
-from pygame.display import RendererWindow
+from pygame.locals import (RENDERER_ACCELERATED, RENDERER_PRESENTVSYNC)
 import os
 
 
@@ -20,12 +20,8 @@ def run():
     pygame.display.init()
     title = "Hello World!"
     rect = (100, 100, 640, 480)
-    flags = RendererWindow.SHOWN
-    with RendererWindow(title, rect, flags) as win:
-        ren = win.renderer
-        flags = (ren.ACCELERATED  |
-                 ren.PRESENTVSYNC   )
-        ren.open(flags)
+    flags = RENDERER_ACCELERATED | RENDERER_PRESENTVSYNC
+    with pygame.display.WindowRenderer(title, rect, flags) as ren:
         image_path = os.path.join(get_resource_path(), 'hello.bmp')
         bmp = pygame.image.load(image_path)
         tex = ren.new_texture_from_surface(bmp)

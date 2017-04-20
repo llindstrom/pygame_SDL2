@@ -47,10 +47,64 @@
 #define DEC_CONSTKSYM(x) DEC_CONSTKSYMS(x, x)
 #define DEC_CONSTN(x) DEC_CONSTS(x, x)
 #define DEC_CONSTSF(x) DEC_CONSTS(x, PGS_##x)
+#define DEC_CONSTW(x) DEC_CONST(WINDOW_##x)
 #endif /* SDL2 */
 
 #define ADD_STRING_CONST(x) \
     if (PyModule_AddStringConstant(module, #x, x)) ADD_ERROR
+
+#if IS_SDLv2
+/* Renderer creation flags are special in Pygame. Pygame takes advantage of
+ * Pythons long integer type to allow renderer flags to be combined with
+ * SDL window creation flags. This is achieved by left shifting the renderer
+ * SDL flag values by 32.
+ */
+#define ADD_REN_ERROR { Py_DECREF(shift); return -1; }
+#define DEC_CONSTREN2(x) \
+    if (_pg_add_rend_flag(module, #x, (long) SDL_##x, shift)) ADD_REN_ERROR
+#define DEC_CONSTREN(x) DEC_CONSTREN2(RENDERER_##x)
+
+static int
+_pg_add_rend_flag(PyObject *module, const char *name, long i, PyObject *s)
+{
+    PyObject *o = PyLong_FromLong(i);
+    PyObject *f;
+
+    if (o == NULL) {
+        return -1;
+    }
+    f = PyNumber_Lshift(o, s);
+    Py_DECREF(o);
+    if (f == NULL) {
+       return -1;
+    }
+    if (PyModule_AddObject(module, name, f)) {
+        Py_DECREF(f);
+        return -1;
+    }
+    return 0;
+}
+
+static int
+_pg_declare_renderer_flags(PyObject *module)
+{
+    PyObject *shift = PyLong_FromLong(32);
+
+    if (shift == NULL) {
+        goto error;
+    }
+    DEC_CONSTREN(SOFTWARE);
+    DEC_CONSTREN(ACCELERATED);
+    DEC_CONSTREN(PRESENTVSYNC);
+    DEC_CONSTREN(TARGETTEXTURE);
+    Py_DECREF(shift);
+    return 0;
+
+error:
+    Py_XDECREF(shift);
+    return -1;
+}
+#endif /* IS_SDLv2 */
 
 
 static PyMethodDef _constant_methods[] =
@@ -802,6 +856,28 @@ MODINIT_DEFINE(constants)
 
 #define PYGAME_USEREVENT_DROPFILE  0x1000
     DEC_CONSTS(USEREVENT_DROPFILE, PYGAME_USEREVENT_DROPFILE);
+
+#if IS_SDLv2
+    /* Window flags: Pygame WINDOW_ constants.
+     */
+    DEC_CONSTW(FULLSCREEN);
+    DEC_CONSTW(FULLSCREEN_DESKTOP);
+    DEC_CONSTW(OPENGL);
+    DEC_CONSTW(HIDDEN);
+    DEC_CONSTW(BORDERLESS);
+    DEC_CONSTW(RESIZABLE);
+    DEC_CONSTW(MINIMIZED);
+    DEC_CONSTW(MAXIMIZED);
+    DEC_CONSTW(INPUT_GRABBED);
+    DEC_CONSTW(ALLOW_HIGHDPI);
+
+    /* Renderer flags: Pygame RENDERER_ constants.
+     */
+    if (_pg_declare_renderer_flags(module)) {
+        DECREF_MOD(module);
+        MODINIT_ERROR;
+    }
+#endif /* IS_SDLv2 */
 
     MODINIT_RETURN (module);
 

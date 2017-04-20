@@ -1668,15 +1668,19 @@ MODINIT_DEFINE (display)
         MODINIT_ERROR;
     }
 #else /* SDL2 */
-    Py_INCREF (pgRendererWindow_Type);
-    if (PyModule_AddObject (module, "RendererWindow", pgRendererWindow_Type)) {
-        Py_DECREF (pgRendererWindow_Type);
+    Py_INCREF (pgWindowRenderer_Type);
+    if (PyModule_AddObject (module,
+                            "WindowRenderer",
+                            (PyObject *)pgWindowRenderer_Type)) {
+        Py_DECREF (pgWindowRenderer_Type);
         DECREF_MOD (module);
         MODINIT_ERROR;
     }
-    Py_INCREF (pgSurfaceWindow_Type);
-    if (PyModule_AddObject (module, "SurfaceWindow", pgSurfaceWindow_Type)) {
-        Py_DECREF (pgSurfaceWindow_Type);
+    Py_INCREF (pgWindowSurface_Type);
+    if (PyModule_AddObject (module,
+                            "WindowSurface",
+                            (PyObject *)pgWindowSurface_Type)) {
+        Py_DECREF (pgWindowSurface_Type);
         DECREF_MOD (module);
         MODINIT_ERROR;
     }
