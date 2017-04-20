@@ -14,6 +14,7 @@ cdef extern from "pygame.h":
         cdef SDL_Surface *surf
         cdef SubSurface_Data *subsurface
 
+    SDL_Surface *PySurface_AsSurface(object surface)
     object PySurface_New(SDL_Surface *surface)
     object PySurface_NewNoOwn(SDL_Surface *surface)
     void import_pygame_surface() except *

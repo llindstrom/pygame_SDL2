@@ -20,11 +20,12 @@ def run():
     pygame.display.init()
     title = "Hello World!"
     rect = (100, 100, 640, 480)
-    flags = RENDERER_ACCELERATED | RENDERER_PRESENTVSYNC
-    with pygame.display.WindowRenderer(title, rect, flags) as ren:
+    with pygame.display.Window(title, rect) as win:
+        flags = RENDERER_ACCELERATED | RENDERER_PRESENTVSYNC
+        ren = win.create_renderer(flags=flags)
         image_path = os.path.join(get_resource_path(), 'hello.bmp')
         bmp = pygame.image.load(image_path)
-        tex = ren.new_texture_from_surface(bmp)
+        tex = ren.create_texture_from_surface(bmp)
 
         for i in range(3):
             ren.clear()

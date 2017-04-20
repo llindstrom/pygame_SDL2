@@ -7,13 +7,12 @@ from pygame.surface import Surface
 include "doc/window_doc.pxi"
 from cpython.object cimport PyObject, PyTypeObject
 
-DEF WindowFlagsMask = 0xFFFFFFFF
-DEF RenderFlagsOffset = 32
 
 # Exported Pygame C API
 #
-cdef api PyTypeObject *pgWindowRenderer_Type;
-cdef api PyTypeObject *pgWindowSurface_Type;
+cdef api PyTypeObject *pgWindow_Type
+cdef api PyTypeObject *pgWindowSurface_Type
+cdef api PyTypeObject *pgWindowRenderer_Type
 
 
 # Support code
@@ -24,20 +23,27 @@ cdef raise_sdl_error():
     raise pygame.error(msg)
 
 
-cdef class WindowSurface(Surface):
-    """A display surface returned by property SurfaceWindow.surface
+# Class declarations
+#
+cdef class Window:
+    """A display window
 
-    The associated window can be refreshed with by calling method update. If
-    the surface is closed by calling method close() or method close_window()
-    the surface in invalidated. ********
+    Window(title, location, flags)
+
+    title: the window title, a string
+    location: either a (width, height) size or a (x, y, width, height)
+              rectangle of position and size, a sequence of integers
+              (particularly a Rect)
+    flags: SDL window flags. An additional Pygame flag is WINDOW_CENTERED.
+           If flags is None then the default ... flags are used.
+
+    A pygame.error exception is raised for any window creation problems.
     """
-
-    # Window mixin
-    # Duplicate any changes here in class WindowRenderer
-    #
     cdef SDL_Window *window_p
+    cdef readonly object renderer
+    cdef readonly object surface
 
-    cdef int open_window(self, char *title, loc, Uint32 flags) except -1:
+    def __cinit__(self, char *title, loc, Uint32 flags=SDL_WINDOW_SHOWN):
         cdef int x
         cdef int y
         cdef int w
@@ -54,16 +60,80 @@ cdef class WindowSurface(Surface):
             msg = "expect a size or rectangle for location"
             raise ValueError(msg)
         self.window_p = SDL_CreateWindow(title, x, y, w, h, flags)
-        if self.window_p == NULL:
+        if not self.window_p:
             raise_sdl_error()
-        return 0
 
-    cdef void close_window(self):
-        # Destroy the SDL window
-        #
-        if self.window_p != NULL:
+    def close(self):
+        """Destroy the SDL window
+        """
+        if self:
+            if self.renderer is not None:
+                self.renderer.close()
+            if self.surface is not None:
+                self.surface.close()
             SDL_DestroyWindow(self.window_p)
             self.window_p = NULL
+
+    def create_surface(self, subclass=None):
+        """Create a display surface object for the window
+        """
+        cdef SDL_Surface *surface_p
+
+        if not self:
+            msg = "Window closed"
+            raise pygame.error(msg)
+        if self.surface is not None:
+            msg = "Window already has a surface object"
+            raise AttributeError(msg)
+        if subclass is None:
+            subclass = WindowSurface
+        elif not issubclass(subclass, WindowSurface):
+            msg = "{} not a subclass of WindowSurface".format(subclass)
+            raise TypeError(msg)       
+        surface_p = SDL_GetWindowSurface(self.window_p)
+        if surface_p == NULL:
+            raise_sdl_error()
+        self.surface = subclass.__new__(subclass)
+        (<Surface>self.surface).surf = surface_p
+        (<WindowSurface>self.surface).window_o = <PyObject *>self
+        return self.surface
+
+    def create_renderer(self, Uint32 flags=0, int index=-1, subclass=None):
+        """Create a renderer object for the window
+        """
+        cdef SDL_Renderer *surface_p
+
+        if not self:
+            msg = "Window closed"
+            raise pygame.error(msg)
+        if self.renderer is not None:
+            msg = "Window already has a renderer object"
+            raise AttributeError(msg)
+        if flags != 0 and index != -1:
+            msg = "both renderer flags and a driver index were given"
+            raise ValueError(msg)
+        if subclass is None:
+            subclass = WindowRenderer
+        elif not issubclass(subclass, WindowRenderer):
+            msg = "{} not a subclass of WindowRenderer".format(subclass)
+            raise TypeError(msg)       
+        renderer_p = SDL_CreateRenderer(self.window_p, index, flags)
+        if renderer_p == NULL:
+            raise_sdl_error()
+        try:
+            self.renderer = subclass.__new__(subclass)
+        except:
+            SDL_DestroyRenderer(renderer_p)
+            raise
+        (<Renderer>self.renderer).renderer_p = renderer_p
+        (<WindowRenderer>self.renderer).window_o = <PyObject *>self
+        return self.renderer
+
+    def __nonzero__(self):
+        return self.window_p != NULL
+
+    def __dealloc__(self):
+        self.close()
 
     def __enter__(self):
         return self
@@ -71,18 +141,19 @@ cdef class WindowSurface(Surface):
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
         return False
-    #
-    # End Window mixin
 
-    def __init__(self, char *title, loc, Uint32 flags):
-        self.close()
-        self.open_window(title, loc, flags)
-        self.surf = SDL_GetWindowSurface(self.window_p)
-        if self.surf == NULL:
-            raise_sdl_error()
+
+cdef class WindowSurface(Surface):
+    """A display surface returned by property SurfaceWindow.surface
+
+    The associated window can be refreshed by calling method update. If
+    the surface is closed by method close() or its window is closed,
+    the surface in invalidated. ********
+    """
+    cdef PyObject *window_o
 
     def __nonzero__(self):
-        return self.window_p != NULL
+        return self.surf != NULL
 
     def update(self, rects=None):
         ## incomplete
@@ -96,20 +167,25 @@ cdef class WindowSurface(Surface):
         A pygame.error exception is raised for any window update problems
         or if the surface is not associated with a window.
         """
-        if self.surf == NULL:
-            msg = "display surface quit"
+        if not self:
+            msg = "display Surface quit"
             raise pygame.error(msg)
-        if SDL_UpdateWindowSurface(self.window_p) < 0:
+        if not self.window_o:
+            msg = "no associated window to update"
+            raise pygame.error(msg)
+        if SDL_UpdateWindowSurface((<Window>self.window_o).window_p) < 0:
             raise_sdl_error()
+
+    @property
+    def window(self):
+        return <object>self.window_o if self.window_o != NULL else None
 
     def close(self):
         ## What about locking?
         if self:
-            self.close_window()
             self.surf = NULL
-
-    def __dealloc__(self):
-        self.close()
+            (<Window>self.window_o).surface = None
+            self.window_o = NULL
 
 
 cdef class Renderer:
@@ -117,8 +193,6 @@ cdef class Renderer:
     
     This is an abstract class.
     """
-    ACCELERATED = SDL_RENDERER_ACCELERATED
-    PRESENTVSYNC = SDL_RENDERER_PRESENTVSYNC
 
     cdef SDL_Renderer *renderer_p
     cdef object textures
@@ -130,13 +204,19 @@ cdef class Renderer:
         return self.renderer_p != NULL
 
     def close(self):
-        close_renderer(self)
+        """Destroy all SDL textures and the SDL renderer
+        """
+        if self:
+            for texture in self.get_textures():
+                texture.close()
+            SDL_DestroyRenderer(self.renderer_p)
+            self.renderer_p = NULL
 
     def new_texture(self, Uint32 format, int access, size, subclass=None):
         ## incomplete
         pass
 
-    def new_texture_from_surface(self, surface, subclass=None):
+    def create_texture_from_surface(self, surface, subclass=None):
         cdef SDL_Texture *texture_p
         cdef SDL_Surface *surface_p
 
@@ -150,7 +230,7 @@ cdef class Renderer:
             subclass = Texture
         elif not issubclass(subclass, Texture):
             raise TypeError("argument subclass not a subclass of Texture")
-        surface_p = (<Surface>surface).surf
+        surface_p = PySurface_AsSurface(surface)
         if not surface_p:
             raise pygame.error("display Surface quit")
         texture_p = SDL_CreateTextureFromSurface(self.renderer_p, surface_p)
@@ -167,14 +247,10 @@ cdef class Renderer:
     def get_textures(self):
         """Return a list of accociated textures
 
-        The list will be empty if the renderer is closed.
+        The list is empty if the renderer is closed.
         """
         textures = self.textures
-        if textures is None:
-            textures = []
-        else:
-            textures = list(textures)
-        return textures
+        return list(textures) if textures is not None else []
 
     def clear(self):
         if not self:
@@ -184,27 +260,7 @@ cdef class Renderer:
             raise_sdl_error()
 
     def __dealloc__(self):
-        close_renderer(self)
-
-cdef object new_renderer(SDL_Renderer *renderer_p, subclass):
-    cdef Renderer renderer
-
-    renderer = subclass.__new__(subclass)
-    renderer.renderer_p = renderer_p
-    renderer.textures = set()
-    return renderer
-
-cdef close_renderer(Renderer r):
-    # Destroy all SDL textures and the SDL renderer
-    #
-    if r.renderer_p:
-        for texture in r.get_textures():
-            texture.close()
-        SDL_DestroyRenderer(r.renderer_p)
-        r.renderer_p = NULL
-        
-cdef void renderer_remove_texture(Renderer r, texture):
-    r.textures.remove(texture)
+        self.close()
 
 
 cdef class Texture:
@@ -216,21 +272,31 @@ cdef class Texture:
         """
         return self.texture_p != NULL
 
+    @property
+    def renderer(self):
+        return <object>self.renderer_o if self.renderer_o != NULL else None 
+
     def close(self):
         """Release this texture's resources
         """
-        close_texture(self)
+        # Destroy the SDL texture and disassociate from its renderer
+        #
+        if self:
+            SDL_DestroyTexture(self.texture_p)
+            self.texture_p = NULL
+            (<Renderer>self.renderer_o).textures.remove(self)
+            self.renderer_o = NULL
 
     def copy_to_renderer(self, src_rect=None, dst_rect=None):
         ## incomplete: want src and dst rects.
-        if not self.texture_p:
+        if not self:
             raise pygame.error("The texture is closed")
         renderer_p = (<Renderer>self.renderer_o).renderer_p
         if SDL_RenderCopy(renderer_p, self.texture_p, NULL, NULL) < 0:
             raise_sdl_error()
 
     def __dealloc__(self):
-        close_texture(self)
+        self.close()
 
 cdef object new_texture(subclass, renderer, SDL_Texture *texture_p): 
     cdef Texture texture
@@ -240,87 +306,26 @@ cdef object new_texture(subclass, renderer, SDL_Texture *texture_p):
     texture.renderer_o = <PyObject *>renderer
     return texture
 
-cdef void close_texture(Texture t):
-    # Destroy the SDL texture and disassociate the object from its renderer
-    #
-    if t:
-        SDL_DestroyTexture(t.texture_p)
-        t.texture_p = NULL
-        renderer_remove_texture(<WindowRenderer>t.renderer_o, t)
-        t.renderer_o = NULL
-
 
 cdef class WindowRenderer(Renderer):
     DOC_WINDOWWINDOWRENDERER
 
-    # Window mixin
-    # Duplicate any changes here in class WindowSurface
-    #
-    cdef SDL_Window *window_p
-
-    cdef int open_window(self, char *title, loc, Uint32 flags) except -1:
-        cdef int x
-        cdef int y
-        cdef int w
-        cdef int h
-
-        ## Put Rect specific code here. Does not need special error checking.
-        if len(loc) == 2:
-            x = SDL_WINDOWPOS_UNDEFINED
-            y = SDL_WINDOWPOS_UNDEFINED
-            w, h = loc
-        elif len(loc) == 4:
-            x, y, w, h = loc
-        else:
-            msg = "expect a size or rectangle for location"
-            raise ValueError(msg)
-        self.window_p = SDL_CreateWindow(title, x, y, w, h, flags)
-        if self.window_p == NULL:
-            raise_sdl_error()
-        return 0
-
-    cdef void close_window(self):
-        # Destroy the SDL window
-        #
-        if self.window_p != NULL:
-            SDL_DestroyWindow(self.window_p)
-            self.window_p = NULL
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-        return False
-    #
-    # End Window mixin
-
-    def __init__(self, char *title, loc, flags, int driver_index=-1):
-        cdef Uint32 window_flags = flags & WindowFlagsMask
-        cdef Uint32 renderer_flags = flags >> RenderFlagsOffset
-
-        self.close()
-        if renderer_flags != 0 and driver_index != -1:
-            msg = "both renderer flags and a driver index were given"
-            raise ValueError(msg)
-        self.open_window(title, loc, window_flags)
-        self.renderer_p = SDL_CreateRenderer(self.window_p,
-                                             driver_index,
-                                             renderer_flags)
-        if self.renderer_p == NULL:
-            self.close_window()
-            raise_sdl_error()
+    cdef PyObject *window_o
 
     def close(self):
-        """Close the renderer and window
+        """Disconnect from an associated window
 
         close() => None
-        """
-        Renderer.close(self)
-        self.close_window()
 
-    # Maybe update applies to surface renderers as well,
-    # so should belong in the Renderer class
+        The renderer becomes invalidated. The window remains open.
+        """
+        if self.window_o != NULL:
+            (<Window>self.window_o).renderer = None
+            self.window_o = NULL
+        Renderer.close(self)
+
+    # Do surface renderers Present?
+    # Maybe update belongs in the Renderer class instead
     def update(self):
         if not self:
             msg = "The renderer is closed"
@@ -335,5 +340,6 @@ cdef class WindowRenderer(Renderer):
 #
 import_pygame_base()
 import_pygame_surface()
+pgWindow_Type = <PyTypeObject *>Window
+pgWindowSurface_Type = <PyTypeObject *>WindowSurface
 pgWindowRenderer_Type = <PyTypeObject *>WindowRenderer
-pgWindowSurface_Type= <PyTypeObject *>WindowSurface
