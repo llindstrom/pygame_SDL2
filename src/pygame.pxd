@@ -1,7 +1,9 @@
-from SDL cimport *
+from SDL cimport SDL_Surface
 
 cdef extern from "pygame.h":
     # base
+    int pgVideo_AutoInit()
+    void pgVideo_AutoQuit()
     void import_pygame_base() except *
 
     # Surface

@@ -1568,11 +1568,6 @@ MODINIT_DEFINE (display)
     if (PyErr_Occurred ()) {
         MODINIT_ERROR;
     }
-#ifdef SDL2
-    if (import_pygame__window ()) {
-        MODINIT_ERROR;
-    }
-#endif /* SDL2 */
 
 #ifndef SDL2
     /* type preparation */
@@ -1611,31 +1606,6 @@ MODINIT_DEFINE (display)
         MODINIT_ERROR;
     }
 #else /* SDL2 */
-    Py_INCREF (pgWindow_Type);
-    if (PyModule_AddObject (module,
-                            "Window",
-                            (PyObject *)pgWindow_Type)) {
-        Py_DECREF (pgWindow_Type);
-        DECREF_MOD (module);
-        MODINIT_ERROR;
-    }
-    Py_INCREF (pgWindowSurface_Type);
-    if (PyModule_AddObject (module,
-                            "WindowSurface",
-                            (PyObject *)pgWindowSurface_Type)) {
-        Py_DECREF (pgWindowSurface_Type);
-        DECREF_MOD (module);
-        MODINIT_ERROR;
-    }
-    Py_INCREF (pgWindowSurface_Type);
-    if (PyModule_AddObject (module,
-                            "WindowRenderer",
-                            (PyObject *)pgWindowRenderer_Type)) {
-        Py_DECREF (pgWindowRenderer_Type);
-        DECREF_MOD (module);
-        MODINIT_ERROR;
-    }
-
     state = DISPLAY_MOD_STATE (module);
     state->title = NULL;
     state->icon = NULL;

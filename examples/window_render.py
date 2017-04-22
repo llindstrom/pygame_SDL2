@@ -7,6 +7,7 @@ This is adapted from the SDL 2 example at
 """
 
 import pygame
+import pygame.video
 from pygame.locals import (RENDERER_ACCELERATED, RENDERER_PRESENTVSYNC)
 import os
 
@@ -17,10 +18,9 @@ def get_resource_path():
 
 
 def run():
-    pygame.display.init()
     title = "Hello World!"
     rect = (100, 100, 640, 480)
-    with pygame.display.Window(title, rect) as win:
+    with pygame.video.Window(title, rect) as win:
         flags = RENDERER_ACCELERATED | RENDERER_PRESENTVSYNC
         ren = win.create_renderer(flags=flags)
         image_path = os.path.join(get_resource_path(), 'hello.bmp')

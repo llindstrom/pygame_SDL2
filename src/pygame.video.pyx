@@ -4,15 +4,19 @@
 from pygame cimport *
 import pygame
 from pygame.surface import Surface
+from SDL cimport (
+    Uint32,
+    SDL_GetError, SDL_ClearError,
+    SDL_WINDOW_SHOWN, SDL_WINDOWPOS_UNDEFINED,
+    SDL_Window, SDL_CreateWindow, SDL_DestroyWindow,
+    SDL_GetWindowSurface, SDL_UpdateWindowSurface,
+    SDL_ShowWindow, SDL_HideWindow,
+    SDL_Renderer, SDL_CreateRenderer, SDL_DestroyRenderer,
+    SDL_RenderClear, SDL_RenderCopy, SDL_RenderPresent,
+    SDL_Texture, SDL_CreateTextureFromSurface, SDL_DestroyTexture
+    )
 include "doc/window_doc.pxi"
 from cpython.object cimport PyObject, PyTypeObject
-
-
-# Exported Pygame C API
-#
-cdef api PyTypeObject *pgWindow_Type
-cdef api PyTypeObject *pgWindowSurface_Type
-cdef api PyTypeObject *pgWindowRenderer_Type
 
 
 # Support code
@@ -35,7 +39,7 @@ cdef class Window:
               rectangle of position and size, a sequence of integers
               (particularly a Rect)
     flags: SDL window flags. An additional Pygame flag is WINDOW_CENTERED.
-           If flags is None then the default ... flags are used.
+           The default value is SDL_WINDOW_SHOWN.
 
     A pygame.error exception is raised for any window creation problems.
     """
@@ -141,6 +145,18 @@ cdef class Window:
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
         return False
+
+    def hide(self):
+        if not self:
+            msg = "Window closed"
+            raise pygame.error(msg)
+        SDL_HideWindow(self.window_p)
+
+    def show(self):
+        if not self:
+            msg = "Window closed"
+            raise pygame.error(msg)
+        SDL_ShowWindow(self.window_p)
 
 
 cdef class WindowSurface(Surface):
@@ -336,10 +352,15 @@ cdef class WindowRenderer(Renderer):
         self.close()
 
 
+def init():
+    if not pgVideo_AutoInit():
+        raise_sdl_error()
+
+def quit():
+    pgVideo_AutoQuit()
+
+
 # Module initialization
 #
 import_pygame_base()
 import_pygame_surface()
-pgWindow_Type = <PyTypeObject *>Window
-pgWindowSurface_Type = <PyTypeObject *>WindowSurface
-pgWindowRenderer_Type = <PyTypeObject *>WindowRenderer

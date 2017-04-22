@@ -46,7 +46,7 @@ _freetype src/freetype/ft_cache.c src/freetype/ft_wrap.c src/freetype/ft_render.
 base src/base.c $(SDL) $(DEBUG)
 color src/color.c $(SDL) $(DEBUG)
 constants src/constants.c $(SDL) $(DEBUG)
-window src/pygame.window.pyx.c $(SDL) $(DEBUG)
+video src/pygame.video.pyx.c $(SDL) $(DEBUG)
 display src/display.c $(SDL) $(DEBUG)
 event src/event.c $(SDL) $(DEBUG)
 #fastevent src/fastevent.c src/fastevents.c $(SDL) $(DEBUG)

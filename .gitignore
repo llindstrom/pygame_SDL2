@@ -29,8 +29,7 @@
 *.swp
 
 # Cython generated C files
-src/pygame.window.c
-src/pygame.window_api.h
+src/pygame.video.c
 
 # Other
 envdev*
